@@ -1,9 +1,3 @@
-//Viral Science www.viralsciencecreativity.com www.youtube.com/c/viralscience
-//Flex Sensor controlled Robo Hand
-
-//Idle  790--835--793--859--827--
-//Close 880--844--802--866--831--
-
 #include <AltSoftSerial.h>
 #include <ServoTimer2.h>
 
