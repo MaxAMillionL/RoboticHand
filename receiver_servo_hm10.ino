@@ -1,53 +1,69 @@
 // ============================================================
 //  RECEIVER
-//  HM-10 on pins 2 (RX) & 3 (TX)  |  Servo on digital pin 8
-//  Reads the raw flex value sent by the transmitter and maps
-//  it to a servo angle (0–180°).
+//  HM-10 on pins 2 (RX) & 3 (TX)  |  5 Servos on pins 8–12
+//  Parses comma-separated flex values and drives each servo
+//  Format expected: "512,490,323,601,450\n"
 // ============================================================
 
 #include <SoftwareSerial.h>
 #include <Servo.h>
 
-// HM-10 wiring:  Arduino pin 2  → HM-10 TX
-//                Arduino pin 3  → HM-10 RX
 SoftwareSerial BLE(2, 3);   // RX, TX
 
-Servo myServo;
-const int SERVO_PIN = 8;
+const int SERVO_PINS[5] = {8, 9, 10, 11, 12};
+Servo servos[5];
 
-// Must match the calibration values used in the transmitter
 const int FLEX_MIN = 0;
 const int FLEX_MAX = 700;
 
 void setup() {
   Serial.begin(9600);
-  BLE.begin(9600);           // HM-10 default baud rate
-  myServo.attach(SERVO_PIN);
-  myServo.write(0);          // Start at 0°
+  BLE.begin(9600);
+
+  for (int i = 0; i < 5; i++) {
+    servos[i].attach(SERVO_PINS[i]);
+    servos[i].write(0);        // Start all servos at 0°
+  }
+
   Serial.println("Receiver ready");
 }
 
 void loop() {
-  // Read a complete line sent by the transmitter
   if (BLE.available()) {
     String incoming = BLE.readStringUntil('\n');
-    incoming.trim();          // Strip whitespace / CR
+    incoming.trim();
 
     if (incoming.length() > 0) {
-      int flexValue = incoming.toInt();
-
-      // Guard against garbage / out-of-range data
-      flexValue = constrain(flexValue, FLEX_MIN, FLEX_MAX);
-
-      // Map raw flex value → servo angle 0–180°
-      int angle = map(flexValue, FLEX_MIN, FLEX_MAX, 0, 180);
-
-      myServo.write(angle);
-
       Serial.print("Received: ");
-      Serial.print(flexValue);
-      Serial.print("  →  Angle: ");
-      Serial.println(angle);
+      Serial.println(incoming);
+
+      // Parse comma-separated values into an array
+      int fingers[5] = {0};
+      int fingerIndex = 0;
+      int lastComma = -1;
+
+      for (int i = 0; i <= (int)incoming.length() && fingerIndex < 5; i++) {
+        if (i == (int)incoming.length() || incoming.charAt(i) == ',') {
+          // Slice the substring between the last comma and this one
+          String token = incoming.substring(lastComma + 1, i);
+          fingers[fingerIndex++] = token.toInt();
+          lastComma = i;
+        }
+      }
+
+      // Drive each servo from its parsed flex value
+      for (int i = 0; i < 5; i++) {
+        int flexValue = constrain(fingers[i], FLEX_MIN, FLEX_MAX);
+        int angle     = map(flexValue, FLEX_MIN, FLEX_MAX, 0, 180);
+        servos[i].write(angle);
+
+        Serial.print("  Finger ");
+        Serial.print(i + 1);
+        Serial.print(": flex=");
+        Serial.print(flexValue);
+        Serial.print("  angle=");
+        Serial.println(angle);
+      }
     }
   }
 }
